@@ -39,6 +39,29 @@ def profile(username):
     reverse_posts = posts[::-1]
     return render_template('profile.html', title=f'{current_user.fullname} Profile', posts=reverse_posts)
 
+@app.route ('/edit')
+@login_required
+def edit():
+    form = EditProfileForm()
+    form.username.data = current_user.username 
+    form.fullname.data = current_user.fullname
+    form.bio_data = current_user.bio
+
+    if form.validate_on_submit():
+        User = user.query.get(current_user.id)
+        user.username = form.username.data
+        user.fullname = form.fullname.data
+        user.bio = form.bio.data
+
+    if form.profile_pic data():
+        pass
+    
+        db.session.commit()
+    flash('Profile updated', 'succes')
+    return redirect(url_for('profile', username=current_user.username))
+
+    return render_template('edit.html', title=f'Edit')
+
 @app.route('/', methods=['GET', 'POST'])
 @login_required
 def index():
