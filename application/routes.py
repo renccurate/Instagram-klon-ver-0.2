@@ -1,4 +1,4 @@
-from flask import render_template, redirect, url_for, flash, request
+from flask import render_template, redirect, url_for, flash, request, make_response, jsonify
 from flask_login import login_user, login_required, logout_user, current_user
 
 from application import app
@@ -39,28 +39,30 @@ def profile(username):
     reverse_posts = posts[::-1]
     return render_template('profile.html', title=f'{current_user.fullname} Profile', posts=reverse_posts)
 
-@app.route ('/edit')
+@app.route('/edit', methods=['GET', 'POST'])
 @login_required
 def edit():
     form = EditProfileForm()
-    form.username.data = current_user.username 
-    form.fullname.data = current_user.fullname
-    form.bio_data = current_user.bio
 
     if form.validate_on_submit():
-        User = user.query.get(current_user.id)
-        user.username = form.username.data
+        user = User.query.get(current_user.id)
+        if form.username.data != user.username:
+            user.username = form.username.data
         user.fullname = form.fullname.data
         user.bio = form.bio.data
 
-    if form.profile_pic data():
-        pass
-    
-        db.session.commit()
-    flash('Profile updated', 'succes')
-    return redirect(url_for('profile', username=current_user.username))
+        if form.profile_pic.data:
+            pass
 
-    return render_template('edit.html', title=f'Edit')
+        db.session.commit()
+        flash('Profile updated', 'success')
+        return redirect(url_for('profile', username=current_user.username))
+    
+    form.username.data = current_user.username
+    form.fullname.data = current_user.fullname
+    form.bio.data = current_user.bio
+    
+    return render_template('edit.html', title=f'Edit {current_user.username} Profile', form=form)
 
 @app.route('/', methods=['GET', 'POST'])
 @login_required
@@ -82,16 +84,44 @@ def index():
                         .order_by(Post.post_date.desc())\
                         .paginate(page=page, per_page=3)
 
+    # posts = current_user.posts
+
     return render_template('index.html', title='Home', form=form, posts=posts)
 
-@app.route('/signup')
+@app.route('/signup', methods=['GET', 'POST'])
 def signup():
     form = SignUpForm()
-    return render_template('signup.html', title='SignUp', form=form)
+
+    if form.validate_on_submit():
+        user = User(
+            username=form.username.data,
+            password=form.password.data,
+            fullname=form.fullname.data,
+            email=form.email.data
+        )
+        db.session.add(user)
+        db.session.commit()
+        flash('Registration successful! Please log in.', 'success')
+        return redirect(url_for('login'))
+
+    return render_template('signup.html', title='Sign Up', form=form)
 
 @app.route('/about')
 def about():
     return render_template('about.html', title='About')
 
-if __name__ == '__main__':
-    app.run(debug=True)
+@app.route('/like', methods=['GET', 'POST'])
+@login_required
+def like():
+    data = request.json
+    post_id = int(data['postId'])
+    like = Like.query.filter_by(user_id=current_user.id, post_id=post_id).first()
+    if not like:
+        like = Like(user_id=current_user.id, post_id=post_id)
+        db.session.add(like)
+        db.session.commit()
+        return make_response(jsonify({"status": True}), 200)
+    
+    db.session.delete(like)
+    db.session.commit()
+    return make_response(jsonify({"status": False}), 200)
